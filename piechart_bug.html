@@ -1,0 +1,60 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Energy Type Composition (Buggy)</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+
+<h2>Energy Type Composition</h2>
+
+<svg width="500" height="400"></svg>
+
+<script>
+
+const svg = d3.select("svg")
+    .append("g")
+    .attr("transform","translate(250,200)");
+
+const radius = 150;
+
+d3.csv("power_plants.csv").then(data => {
+
+    data.forEach(d => {
+        d.capacity_mw = +d.capacity_mw;
+    });
+
+    // Aggregate total capacity by energy type.
+    const summary = d3.rollups(
+        data,
+        v => d3.sum(v, d => d.capacity_mw),
+        d => d.energy_type
+    ).map(([energy_type, total]) => ({ energy_type, total }));
+
+    const pie = d3.pie()
+        .value(d => d.total);
+
+    // Bug 1
+    const arcs = pie(summary).filter(d => d.value >= 10);
+
+    const arc = d3.arc()
+        .innerRadius(0)
+        .outerRadius(radius);
+
+    const color = d3.scaleOrdinal(d3.schemeCategory10);
+
+    svg.selectAll("path")
+        .data(arcs)
+        .enter()
+        .append("path")
+        .attr("d", arc)
+        // Bug 2
+        .attr("fill", (d, i) => color(i));
+
+});
+
+</script>
+</body>
+</html>

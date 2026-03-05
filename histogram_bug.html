@@ -1,0 +1,88 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Histogram with Bin Size Selector (Buggy)</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+
+<h2>Distribution of Plant Capacity</h2>
+
+<label>Bin Size:</label>
+<input type="range" id="binSlider" min="5" max="50" value="20">
+
+<svg width="700" height="400"></svg>
+
+<script>
+
+const svg = d3.select("svg");
+const width = +svg.attr("width");
+const height = +svg.attr("height");
+
+const margin = {top:20, right:20, bottom:40, left:50};
+const innerWidth = width - margin.left - margin.right;
+const innerHeight = height - margin.top - margin.bottom;
+
+d3.csv("power_plants.csv").then(data => {
+
+    data.forEach(d => {
+        d.capacity_mw = +d.capacity_mw;
+    });
+
+    function draw(binCount){
+
+        svg.selectAll("*").remove();
+
+        const chart = svg.append("g")
+            .attr("transform", `translate(${margin.left}, ${margin.top})`);
+
+        // Bug 1
+        const values = [...new Set(data.map(d => d.capacity_mw))];
+
+        const x = d3.scaleLinear()
+            .domain(d3.extent(values))
+            .range([0, innerWidth]);
+
+        const binGenerator = d3.bin()
+            //Bug 2
+            .domain([0, d3.max(values)])
+            .thresholds(binCount);
+
+        const bins = binGenerator(values);
+
+        const y = d3.scaleLinear()
+            //Bug 3
+            .domain([0, values.length])
+            .range([innerHeight, 0]);
+
+        chart.selectAll("rect")
+            .data(bins)
+            .enter()
+            .append("rect")
+            .attr("x", d => x(d.x0))
+            .attr("y", d => y(d.length))
+            .attr("width", d => Math.max(0, x(d.x1) - x(d.x0) - 1))
+            .attr("height", d => innerHeight - y(d.length))
+            .attr("fill", "steelblue");
+
+        chart.append("g")
+            .attr("transform", "translate(0," + innerHeight + ")")
+            .call(d3.axisBottom(x));
+
+        chart.append("g")
+            .call(d3.axisLeft(y));
+    }
+
+    draw(20);
+
+    d3.select("#binSlider").on("input", function(){
+        draw(this.value);
+    });
+
+});
+
+</script>
+</body>
+</html>

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Box Plot by Energy Type (Buggy)</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+
+<h2>Plant Capacity by Energy Type</h2>
+
+<svg width="700" height="400"></svg>
+
+<script>
+
+const svg = d3.select("svg");
+const width = +svg.attr("width");
+const height = +svg.attr("height");
+
+d3.csv("power_plants.csv").then(data => {
+
+    data.forEach(d => {
+        d.capacity_mw = +d.capacity_mw;
+    });
+
+    const grouped = d3.group(data, d => d.energy_type);
+    const types = Array.from(grouped.keys());
+
+    const x = d3.scaleBand()
+        .domain(types)
+        .range([50, width - 20])
+        .padding(0.2);
+
+    const y = d3.scaleLinear()
+        .domain([0, d3.max(data, d => d.capacity_mw)])
+        .range([height - 40, 20]);
+
+    svg.append("g")
+        .attr("transform", "translate(0," + (height-40) + ")")
+        .call(d3.axisBottom(x));
+
+    svg.append("g")
+        .attr("transform", "translate(50,0)")
+        .call(d3.axisLeft(y));
+
+    grouped.forEach((values, key) => {
+
+        // Bug 1
+        const capacities = values.map(d => d.capacity_mw);
+
+        const q1 = d3.quantileSorted(capacities, 0.25);
+        const median = d3.quantileSorted(capacities, 0.5);
+        const q3 = d3.quantileSorted(capacities, 0.75);
+
+        // Bug 2
+        const min = capacities[0];
+        const max = capacities[capacities.length - 1];
+
+        // Bug 3
+        const center = x(key);
+
+        svg.append("line")
+            .attr("x1", center)
+            .attr("x2", center)
+            .attr("y1", y(min))
+            .attr("y2", y(max))
+            .attr("stroke","black");
+
+        svg.append("rect")
+            .attr("x", center - 10)
+            .attr("width", 20)
+            .attr("y", y(q3))
+            .attr("height", y(q1) - y(q3))
+            .attr("fill","orange");
+
+        svg.append("line")
+            .attr("x1", center - 10)
+            .attr("x2", center + 10)
+            .attr("y1", y(median))
+            .attr("y2", y(median))
+            .attr("stroke","black");
+
+    });
+
+});
+
+</script>
+</body>
+</html>
