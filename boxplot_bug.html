@@ -46,18 +46,19 @@ d3.csv("power_plants.csv").then(data => {
     grouped.forEach((values, key) => {
 
         // Bug 1
-        const capacities = values.map(d => d.capacity_mw);
+        const capacities = values.map(d => d.capacity_mw).sort(d3.ascending);
+        console.log(capacities)
 
         const q1 = d3.quantileSorted(capacities, 0.25);
         const median = d3.quantileSorted(capacities, 0.5);
         const q3 = d3.quantileSorted(capacities, 0.75);
 
         // Bug 2
-        const min = capacities[0];
-        const max = capacities[capacities.length - 1];
+        const min = d3.min(capacities);
+        const max = d3.max(capacities);
 
         // Bug 3
-        const center = x(key);
+        const center = x(key) + (x.bandwidth() / 2);
 
         svg.append("line")
             .attr("x1", center)

@@ -37,7 +37,8 @@ d3.csv("power_plants.csv").then(data => {
         .value(d => d.total);
 
     // Bug 1
-    const arcs = pie(summary).filter(d => d.value >= 10);
+    const filteredSummary = summary.filter(d => d.total >= 10);
+    const arcs = pie(filteredSummary);
 
     const arc = d3.arc()
         .innerRadius(0)
@@ -51,7 +52,7 @@ d3.csv("power_plants.csv").then(data => {
         .append("path")
         .attr("d", arc)
         // Bug 2
-        .attr("fill", (d, i) => color(i));
+        .attr("fill", d => color(d.data.energy_type));
 
 });
 

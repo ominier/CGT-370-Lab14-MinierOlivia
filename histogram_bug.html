@@ -39,7 +39,7 @@ d3.csv("power_plants.csv").then(data => {
             .attr("transform", `translate(${margin.left}, ${margin.top})`);
 
         // Bug 1
-        const values = [...new Set(data.map(d => d.capacity_mw))];
+        const values = data.map(d => d.capacity_mw);
 
         const x = d3.scaleLinear()
             .domain(d3.extent(values))
@@ -47,14 +47,14 @@ d3.csv("power_plants.csv").then(data => {
 
         const binGenerator = d3.bin()
             //Bug 2
-            .domain([0, d3.max(values)])
+            .domain(d3.extent(values))
             .thresholds(binCount);
 
         const bins = binGenerator(values);
 
         const y = d3.scaleLinear()
             //Bug 3
-            .domain([0, values.length])
+            .domain([0, d3.max(bins, d => d.length)])
             .range([innerHeight, 0]);
 
         chart.selectAll("rect")
