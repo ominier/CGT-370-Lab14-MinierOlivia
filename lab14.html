@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lab 14 - Understanding Power Plant Distributions</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 24px;
+      background: #f7f7f7;
+    }
+
+    h1 {
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      margin-top: 0;
+      color: #555;
+    }
+
+    .controls, .insight, .card {
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 18px;
+      max-width: 1100px;
+    }
+
+    .dashboard {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      max-width: 1100px;
+    }
+
+    .full {
+      grid-column: 1 / span 2;
+    }
+
+    .chart-title {
+      margin: 0 0 10px 0;
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    svg {
+      display: block;
+      background: white;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Lab 14: Understanding Power Plant Distributions</h1>
+  <p class="subtitle">A small dashboard exploring the distribution and composition of global power plants.</p>
+
+  <div class="insight">
+    <strong>Insight:</strong> Coal and nuclear plants tend to have higher capacities, while solar and wind plants are generally smaller.
+  </div>
+
+  <div class="controls">
+    <label for="binSlider"><strong>Histogram Bin Count:</strong></label>
+    <input type="range" id="binSlider" min="5" max="30" value="12">
+    <span id="binLabel">12</span>
+  </div>
+
+  <div class="dashboard">
+    <div class="card">
+      <p class="chart-title">Histogram — Distribution of Plant Capacity</p>
+      <svg id="histogram" width="500" height="350"></svg>
+    </div>
+
+    <div class="card">
+      <p class="chart-title">Box Plot — Comparing Energy Types</p>
+      <svg id="boxplot" width="500" height="350"></svg>
+    </div>
+
+    <div class="card full">
+      <p class="chart-title">Composition Chart — Total Capacity by Energy Type</p>
+      <svg id="piechart" width="700" height="400"></svg>
+    </div>
+  </div>
+
+  <script>
+    d3.csv("power_plants.csv").then(data => {
+
+      data.forEach(d => {
+        d.capacity_mw = +d.capacity_mw;
+      });
+
+      drawHistogram(data, 12);
+      drawBoxPlot(data);
+      drawPieChart(data);
+
+      d3.select("#binSlider").on("input", function() {
+        const bins = +this.value;
+        d3.select("#binLabel").text(bins);
+        drawHistogram(data, bins);
+      });
+
+    });
+
+    function drawHistogram(data, binCount) {
+      const svg = d3.select("#histogram");
+      svg.selectAll("*").remove();
+
+      const width = +svg.attr("width");
+      const height = +svg.attr("height");
+      const margin = { top: 20, right: 20, bottom: 50, left: 60 };
+      const innerWidth = width - margin.left - margin.right;
+      const innerHeight = height - margin.top - margin.bottom;
+
+      const g = svg.append("g")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+      const values = data.map(d => d.capacity_mw);
+
+      const x = d3.scaleLinear()
+        .domain(d3.extent(values))
+        .range([0, innerWidth]);
+
+      const histogram = d3.bin()
+        .domain(d3.extent(values))
+        .thresholds(binCount);
+
+      const bins = histogram(values);
+
+      const y = d3.scaleLinear()
+        .domain([0, d3.max(bins, d => d.length)])
+        .range([innerHeight, 0]);
+
+      g.selectAll("rect")
+        .data(bins)
+        .join("rect")
+        .attr("x", d => x(d.x0))
+        .attr("y", d => y(d.length))
+        .attr("width", d => x(d.x1) - x(d.x0) - 2)
+        .attr("height", d => innerHeight - y(d.length))
+        .attr("fill", "steelblue");
+
+      g.append("g")
+        .attr("transform", "translate(0," + innerHeight + ")")
+        .call(d3.axisBottom(x));
+
+      g.append("g")
+        .call(d3.axisLeft(y));
+
+      g.append("text")
+        .attr("x", innerWidth / 2)
+        .attr("y", innerHeight + 40)
+        .attr("text-anchor", "middle")
+        .text("Capacity (MW)");
+
+      g.append("text")
+        .attr("transform", "rotate(-90)")
+        .attr("x", -innerHeight / 2)
+        .attr("y", -40)
+        .attr("text-anchor", "middle")
+        .text("Count");
+    }
+
+    function drawBoxPlot(data) {
+      const svg = d3.select("#boxplot");
+      svg.selectAll("*").remove();
+
+      const width = +svg.attr("width");
+      const height = +svg.attr("height");
+      const margin = { top: 20, right: 20, bottom: 60, left: 60 };
+      const innerWidth = width - margin.left - margin.right;
+      const innerHeight = height - margin.top - margin.bottom;
+
+      const g = svg.append("g")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+      const grouped = d3.rollup(
+        data,
+        v => v.map(d => d.capacity_mw).sort(d3.ascending),
+        d => d.energy_type
+      );
+
+      const energyTypes = Array.from(grouped.keys());
+
+      const x = d3.scaleBand()
+        .domain(energyTypes)
+        .range([0, innerWidth])
+        .padding(0.3);
+
+      const y = d3.scaleLinear()
+        .domain([0, d3.max(data, d => d.capacity_mw)])
+        .range([innerHeight, 0]);
+
+      const color = d3.scaleOrdinal()
+        .domain(energyTypes)
+        .range(d3.schemeCategory10);
+
+      g.append("g")
+        .attr("transform", "translate(0," + innerHeight + ")")
+        .call(d3.axisBottom(x));
+
+      g.append("g")
+        .call(d3.axisLeft(y));
+
+      g.append("text")
+        .attr("x", innerWidth / 2)
+        .attr("y", innerHeight + 45)
+        .attr("text-anchor", "middle")
+        .text("Energy Type");
+
+      g.append("text")
+        .attr("transform", "rotate(-90)")
+        .attr("x", -innerHeight / 2)
+        .attr("y", -40)
+        .attr("text-anchor", "middle")
+        .text("Capacity (MW)");
+
+      grouped.forEach((values, key) => {
+        const min = d3.min(values);
+        const q1 = d3.quantile(values, 0.25);
+        const median = d3.quantile(values, 0.5);
+        const q3 = d3.quantile(values, 0.75);
+        const max = d3.max(values);
+
+        const center = x(key) + x.bandwidth() / 2;
+        const boxWidth = x.bandwidth() / 2;
+
+        g.append("line")
+          .attr("x1", center)
+          .attr("x2", center)
+          .attr("y1", y(min))
+          .attr("y2", y(max))
+          .attr("stroke", "black");
+
+        g.append("rect")
+          .attr("x", center - boxWidth / 2)
+          .attr("y", y(q3))
+          .attr("width", boxWidth)
+          .attr("height", y(q1) - y(q3))
+          .attr("fill", color(key))
+          .attr("stroke", "black");
+
+        g.append("line")
+          .attr("x1", center - boxWidth / 2)
+          .attr("x2", center + boxWidth / 2)
+          .attr("y1", y(median))
+          .attr("y2", y(median))
+          .attr("stroke", "black");
+
+        g.append("line")
+          .attr("x1", center - 12)
+          .attr("x2", center + 12)
+          .attr("y1", y(min))
+          .attr("y2", y(min))
+          .attr("stroke", "black");
+
+        g.append("line")
+          .attr("x1", center - 12)
+          .attr("x2", center + 12)
+          .attr("y1", y(max))
+          .attr("y2", y(max))
+          .attr("stroke", "black");
+      });
+    }
+
+    function drawPieChart(data) {
+      const svg = d3.select("#piechart");
+      svg.selectAll("*").remove();
+
+      const width = +svg.attr("width");
+      const height = +svg.attr("height");
+      const radius = 140;
+
+      const g = svg.append("g")
+        .attr("transform", "translate(" + (width / 2) + "," + (height / 2) + ")");
+
+      const totals = d3.rollup(
+        data,
+        v => d3.sum(v, d => d.capacity_mw),
+        d => d.energy_type
+      );
+
+      const pieData = Array.from(totals, ([energy_type, total]) => ({
+        energy_type: energy_type,
+        total: total
+      }));
+
+      const color = d3.scaleOrdinal()
+        .domain(pieData.map(d => d.energy_type))
+        .range(d3.schemeCategory10);
+
+      const pie = d3.pie()
+        .value(d => d.total);
+
+      const arc = d3.arc()
+        .innerRadius(0)
+        .outerRadius(radius);
+
+      const arcs = pie(pieData);
+
+      g.selectAll("path")
+        .data(arcs)
+        .join("path")
+        .attr("d", arc)
+        .attr("fill", d => color(d.data.energy_type))
+        .attr("stroke", "white")
+        .attr("stroke-width", 2);
+
+      g.selectAll("text")
+        .data(arcs)
+        .join("text")
+        .attr("transform", d => "translate(" + arc.centroid(d) + ")")
+        .attr("text-anchor", "middle")
+        .attr("font-size", "11px")
+        .text(d => d.data.energy_type);
+
+      const legend = svg.append("g")
+        .attr("transform", "translate(520,60)");
+
+      pieData.forEach((d, i) => {
+        legend.append("rect")
+          .attr("x", 0)
+          .attr("y", i * 22)
+          .attr("width", 14)
+          .attr("height", 14)
+          .attr("fill", color(d.energy_type));
+
+        legend.append("text")
+          .attr("x", 22)
+          .attr("y", i * 22 + 12)
+          .text(d.energy_type);
+      });
+    }
+  </script>
+
+</body>
+</html>
